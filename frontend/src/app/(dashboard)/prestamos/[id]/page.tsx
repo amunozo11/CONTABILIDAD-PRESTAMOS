@@ -1,0 +1,289 @@
+'use client';
+import { useState, use } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useRouter } from 'next/navigation';
+import Link from 'next/link';
+import { CheckCircle2, Clock, AlertTriangle, XCircle, Loader2, Phone } from 'lucide-react';
+import { apiClient } from '@/services/api';
+import { formatCOP, formatFechaCO, formatFechaHoraCO, porcentajeProgreso } from '@/lib/utils';
+
+const CUOTA_COLORS: Record<string, string> = {
+  pagada: 'var(--success-500)', vencida: 'var(--danger-500)',
+  pendiente: 'var(--border)', parcial: 'var(--warning-500)',
+};
+
+export default function PrestamoDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = use(params);
+  const router = useRouter();
+  const queryClient = useQueryClient();
+  const [showCancelModal, setShowCancelModal] = useState(false);
+  const [motivo, setMotivo] = useState('');
+
+  const { data: prestamo, isLoading } = useQuery({
+    queryKey: ['prestamo', id],
+    queryFn: () => apiClient.get(`/api/prestamos/${id}`).then((r) => r.data.data),
+  });
+
+  const { data: cobros } = useQuery({
+    queryKey: ['cobros-prestamo', id],
+    queryFn: () => apiClient.get(`/api/cobros/prestamo/${id}`).then((r) => r.data.data),
+    enabled: !!id,
+  });
+
+  const { mutate: cancelar, isPending: cancelando } = useMutation({
+    mutationFn: () => apiClient.post(`/api/prestamos/${id}/cancelar`, { motivo }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['prestamos'] });
+      queryClient.invalidateQueries({ queryKey: ['prestamo', id] });
+      setShowCancelModal(false);
+      router.push('/prestamos');
+    },
+  });
+
+  if (isLoading) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+        {[1,2,3].map(i => <div key={i} className="skeleton" style={{ height: 90, borderRadius: 'var(--radius-lg)' }} />)}
+      </div>
+    );
+  }
+
+  if (!prestamo) return <div className="empty-state">Préstamo no encontrado</div>;
+
+  const prog = porcentajeProgreso(prestamo.totalCobrado, prestamo.totalPagar);
+  const isActivo = prestamo.estado === 'activo';
+  const cuotasVencidas = prestamo.cuotas?.filter((c: { estado: string }) => c.estado === 'vencida').length ?? 0;
+  const cuotasPagadas = prestamo.cuotas?.filter((c: { estado: string }) => c.estado === 'pagada').length ?? 0;
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+      {/* Header */}
+      <div className="card" style={{
+        background: isActivo
+          ? 'linear-gradient(135deg, #4f46e5, #7c3aed)'
+          : 'linear-gradient(135deg, #475569, #64748b)',
+        color: 'white', padding: '20px',
+      }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
+          <div>
+            <p style={{ margin: 0, opacity: 0.8, fontSize: 13 }}>Capital prestado</p>
+            <p style={{ margin: '4px 0 0', fontSize: 28, fontWeight: 800 }}>{formatCOP(prestamo.capital)}</p>
+          </div>
+          <span style={{
+            background: 'rgb(255 255 255 / 0.2)', padding: '4px 12px',
+            borderRadius: 99, fontSize: 12, fontWeight: 700, textTransform: 'uppercase',
+          }}>
+            {prestamo.estado}
+          </span>
+        </div>
+
+        {/* Info cliente */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{
+            width: 40, height: 40, borderRadius: '50%',
+            background: 'rgb(255 255 255 / 0.2)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}>
+            <span style={{ fontWeight: 700 }}>{prestamo.cliente?.nombre?.[0]}</span>
+          </div>
+          <div>
+            <p style={{ margin: 0, fontWeight: 700 }}>{prestamo.cliente?.nombre}</p>
+            <p style={{ margin: '2px 0 0', opacity: 0.8, fontSize: 12 }}>{prestamo.cliente?.celular}</p>
+          </div>
+          <a href={`tel:${prestamo.cliente?.celular}`} style={{ marginLeft: 'auto' }}>
+            <div style={{
+              background: 'rgb(255 255 255 / 0.2)', width: 36, height: 36,
+              borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}>
+              <Phone size={18} />
+            </div>
+          </a>
+        </div>
+      </div>
+
+      {/* Progreso */}
+      <div className="card">
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 12 }}>
+          <div>
+            <p style={{ margin: 0, fontSize: 13, color: 'var(--text-muted)' }}>Cobrado</p>
+            <p style={{ margin: '4px 0 0', fontSize: 20, fontWeight: 800, color: 'var(--success-500)' }}>
+              {formatCOP(prestamo.totalCobrado)}
+            </p>
+          </div>
+          <div style={{ textAlign: 'right' }}>
+            <p style={{ margin: 0, fontSize: 13, color: 'var(--text-muted)' }}>Saldo</p>
+            <p style={{ margin: '4px 0 0', fontSize: 20, fontWeight: 800, color: 'var(--danger-500)' }}>
+              {formatCOP(prestamo.saldoPendiente)}
+            </p>
+          </div>
+        </div>
+        <div className="progress-bar">
+          <div className={`progress-fill ${prog >= 100 ? 'success' : ''}`} style={{ width: `${prog}%` }} />
+        </div>
+        <p style={{ margin: '8px 0 0', textAlign: 'center', fontSize: 13, color: 'var(--text-muted)' }}>
+          {prog}% cobrado de {formatCOP(prestamo.totalPagar)}
+        </p>
+      </div>
+
+      {/* Detalles financieros */}
+      <div className="card">
+        <h2 style={{ margin: '0 0 14px', fontSize: 15, fontWeight: 700 }}>Condiciones</h2>
+        {[
+          { label: 'Interés (20%)', value: formatCOP(prestamo.totalInteres) },
+          { label: 'Papelería descontada', value: formatCOP(prestamo.papeleria ?? 0) },
+          { label: 'El cliente recibió', value: formatCOP(prestamo.montoDesembolsado ?? 0), highlight: true },
+          { label: 'Total a pagar', value: formatCOP(prestamo.totalPagar), highlight: true },
+          { label: prestamo.modalidad === 'diaria' ? 'Cuota diaria' : 'Cuota semanal', value: formatCOP(prestamo.cuotaDiaria) },
+          { label: 'Fecha inicio', value: formatFechaCO(prestamo.fechaInicio) },
+          { label: 'Fecha fin', value: formatFechaCO(prestamo.fechaFin) },
+          { label: 'Cobrador', value: prestamo.cobrador?.nombre ?? '' },
+        ].map(({ label, value, highlight }) => (
+          <div key={label} style={{
+            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+            padding: '8px 0', borderBottom: '1px solid var(--border)',
+          }}>
+            <span style={{ fontSize: 14, color: 'var(--text-secondary)' }}>{label}</span>
+            <span style={{
+              fontSize: highlight ? 15 : 14,
+              fontWeight: highlight ? 800 : 600,
+              color: highlight ? 'var(--brand-600)' : 'var(--text-primary)',
+            }}>{value}</span>
+          </div>
+        ))}
+
+        {/* Contadores de cuotas */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 10, marginTop: 14 }}>
+          {[
+            { label: 'Pagadas', count: cuotasPagadas, color: 'var(--success-500)' },
+            { label: 'Vencidas', count: cuotasVencidas, color: 'var(--danger-500)' },
+            { label: 'Pendientes', count: (prestamo.numeroCuotas - cuotasPagadas - cuotasVencidas), color: 'var(--text-muted)' },
+          ].map(({ label, count, color }) => (
+            <div key={label} style={{ textAlign: 'center', padding: '10px 8px',
+              background: 'var(--bg-input)', borderRadius: 'var(--radius-md)' }}>
+              <p style={{ margin: 0, fontSize: 22, fontWeight: 800, color }}>{count}</p>
+              <p style={{ margin: '2px 0 0', fontSize: 11, color: 'var(--text-muted)', fontWeight: 600 }}>{label}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Cuadrícula de cuotas */}
+      <div className="card">
+        <h2 style={{ margin: '0 0 12px', fontSize: 15, fontWeight: 700 }}>Estado de cuotas</h2>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(10, 1fr)', gap: 4 }}>
+          {(prestamo.cuotas ?? []).map((cuota: { numero: number; estado: string }) => (
+            <div
+              key={cuota.numero}
+              title={`Cuota ${cuota.numero}: ${cuota.estado}`}
+              style={{
+                height: 14,
+                borderRadius: 2,
+                background: CUOTA_COLORS[cuota.estado] ?? 'var(--border)',
+              }}
+            />
+          ))}
+        </div>
+        <div style={{ display: 'flex', gap: 16, marginTop: 8, flexWrap: 'wrap' }}>
+          {[
+            { label: 'Pagada', color: 'var(--success-500)' },
+            { label: 'Vencida', color: 'var(--danger-500)' },
+            { label: 'Pendiente', color: 'var(--border)' },
+            { label: 'Parcial', color: 'var(--warning-500)' },
+          ].map(({ label, color }) => (
+            <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+              <div style={{ width: 10, height: 10, borderRadius: 2, background: color }} />
+              <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{label}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Historial de cobros */}
+      {cobros && cobros.length > 0 && (
+        <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+          <h2 style={{ margin: 0, padding: '14px 16px', fontSize: 15, fontWeight: 700,
+            borderBottom: '1px solid var(--border)' }}>
+            Cobros registrados
+          </h2>
+          {cobros.slice(0, 10).map((c: { _id: string; monto: number; tipo: string; hora: string; fecha: string; anulado: boolean }) => (
+            <div key={c._id} className="list-item" style={{ cursor: 'default', opacity: c.anulado ? 0.5 : 1 }}>
+              <CheckCircle2 size={18} color={c.anulado ? 'var(--text-muted)' : 'var(--success-500)'} />
+              <div style={{ flex: 1 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ fontSize: 14, fontWeight: 600 }}>{formatCOP(c.monto)}</span>
+                  <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--success-600)' }}>
+                    {c.anulado ? <span style={{ color: 'var(--danger-500)' }}>Anulado</span> : `+${formatCOP(c.monto)}`}
+                  </span>
+                </div>
+                <p style={{ margin: '2px 0 0', fontSize: 11, color: 'var(--text-muted)' }}>
+                  {formatFechaHoraCO(c.fecha)} · {c.tipo}
+                </p>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Acciones */}
+      {isActivo && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <Link href={`/cobros/registrar?prestamoId=${id}`}>
+            <button className="btn-primary">Registrar cobro</button>
+          </Link>
+          <Link href={`/prestamos/nuevo?refinanciarId=${id}`}>
+            <button className="btn-secondary">Refinanciar préstamo</button>
+          </Link>
+          <button
+            className="btn-danger"
+            onClick={() => setShowCancelModal(true)}
+            style={{ background: 'transparent', color: 'var(--danger-500)', border: '1.5px solid var(--danger-500)' }}
+          >
+            Cancelar préstamo
+          </button>
+        </div>
+      )}
+
+      {/* Modal de cancelación */}
+      {showCancelModal && (
+        <div style={{
+          position: 'fixed', inset: 0, background: 'rgb(0 0 0 / 0.5)',
+          display: 'flex', alignItems: 'flex-end', zIndex: 200,
+        }} onClick={() => setShowCancelModal(false)}>
+          <div
+            className="animate-slide-up"
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: 'var(--bg-card)', borderRadius: '20px 20px 0 0',
+              padding: '24px 20px', width: '100%',
+            }}
+          >
+            <h3 style={{ margin: '0 0 16px', fontSize: 18, fontWeight: 700 }}>¿Cancelar préstamo?</h3>
+            <p style={{ margin: '0 0 16px', fontSize: 14, color: 'var(--text-muted)' }}>
+              Esta acción no se puede deshacer. El saldo pendiente se registrará como incobrable.
+            </p>
+            <textarea
+              className="input-field"
+              placeholder="Motivo de cancelación (mínimo 5 caracteres)"
+              rows={3}
+              value={motivo}
+              onChange={(e) => setMotivo(e.target.value)}
+              style={{ resize: 'none', marginBottom: 14 }}
+            />
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+              <button className="btn-secondary" onClick={() => setShowCancelModal(false)}>
+                Volver
+              </button>
+              <button
+                className="btn-danger"
+                disabled={motivo.length < 5 || cancelando}
+                onClick={() => cancelar()}
+              >
+                {cancelando ? <Loader2 size={16} className="animate-pulse-soft" /> : 'Confirmar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
