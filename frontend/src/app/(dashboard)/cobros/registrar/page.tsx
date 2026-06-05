@@ -63,11 +63,11 @@ export default function RegistrarCobroPage() {
     if (tipoSeleccionado === 'diario') {
       const m = prestamoSeleccionado.cuotaDiaria;
       setMontoVal(`$ ${m.toLocaleString('es-CO')}`);
-      setValue('monto', m as unknown as number);
+      setValue('monto', String(m) as unknown as number);
     } else if (tipoSeleccionado === 'total') {
       const m = prestamoSeleccionado.saldoPendiente;
       setMontoVal(`$ ${m.toLocaleString('es-CO')}`);
-      setValue('monto', m as unknown as number);
+      setValue('monto', String(m) as unknown as number);
     }
   }, [tipoSeleccionado, prestamoSeleccionado, setValue]);
 
