@@ -132,7 +132,7 @@ export default function ClientesPage() {
                     style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                   />
                 ) : (
-                  <span style={{ fontSize: 18, fontWeight: 700, color: 'var(--brand-600)' }}>
+                  <span style={{ fontSize: 18, fontWeight: 700, color: 'var(--brand-text)' }}>
                     {cliente.nombre[0].toUpperCase()}
                   </span>
                 )}
@@ -147,7 +147,7 @@ export default function ClientesPage() {
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 2 }}>
                   <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{cliente.celular}</span>
                   {cliente.prestamosActivos > 0 && (
-                    <span style={{ fontSize: 11, background: 'var(--brand-50)', color: 'var(--brand-600)',
+                    <span style={{ fontSize: 11, background: 'var(--brand-50)', color: 'var(--brand-text)',
                       padding: '1px 6px', borderRadius: 99, fontWeight: 600 }}>
                       {cliente.prestamosActivos} activo{cliente.prestamosActivos > 1 ? 's' : ''}
                     </span>

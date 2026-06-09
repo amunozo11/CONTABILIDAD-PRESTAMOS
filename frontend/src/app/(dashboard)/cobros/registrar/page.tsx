@@ -225,7 +225,7 @@ export default function RegistrarCobroPage() {
                   gap: 2,
                 }}>
                   <input type="radio" value={val} style={{ display: 'none' }} {...register('tipo')} />
-                  <span style={{ fontSize: 13, fontWeight: 700, color: tipoSeleccionado === val ? 'var(--brand-600)' : 'var(--text-primary)' }}>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: tipoSeleccionado === val ? 'var(--brand-text)' : 'var(--text-primary)' }}>
                     {label}
                   </span>
                   <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{desc}</span>

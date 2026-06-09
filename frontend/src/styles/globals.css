@@ -10,6 +10,8 @@
   --brand-500: #4f46e5;
   --brand-600: #4338ca;
   --brand-700: #3730a3;
+  /* Color de texto sobre fondos claros (brand-50/brand-100) — alto contraste */
+  --brand-text: #312e81;
 
   /* Semánticos */
   --success-400: #34d399;
@@ -71,8 +73,9 @@
     --border:        #334155;
     --border-focus:  var(--brand-400);
     --text-primary:  #f1f5f9;
-    --text-secondary:#cbd5e1;
-    --text-muted:    #64748b;
+    --text-secondary:#cbd5e1;           /* era #cbd5e1, OK */
+    --text-muted:    #94a3b8;           /* era #64748b — muy oscuro en dark, subido a slate-400 */
+    --brand-text:    #a5b4fc;           /* en dark, texto brand debe ser claro (indigo-300) */
     --shadow-card:   0 2px 8px 0 rgb(0 0 0 / 0.3);
   }
 }
@@ -339,11 +342,11 @@ body {
   letter-spacing: 0.05em;
 }
 
-.badge-success { background: rgb(16 185 129 / 0.12); color: var(--success-600); }
-.badge-warning { background: rgb(245 158 11 / 0.12); color: var(--warning-600); }
-.badge-danger  { background: rgb(239 68 68 / 0.12);  color: var(--danger-600); }
-.badge-brand   { background: rgb(79 70 229 / 0.12);  color: var(--brand-600); }
-.badge-muted   { background: var(--bg-input);         color: var(--text-muted); }
+.badge-success { background: rgb(16 185 129 / 0.15); color: var(--success-600); }
+.badge-warning { background: rgb(245 158 11 / 0.15); color: var(--warning-600); }
+.badge-danger  { background: rgb(239 68 68 / 0.15);  color: var(--danger-600); }
+.badge-brand   { background: rgb(79 70 229 / 0.15);  color: var(--brand-text); }
+.badge-muted   { background: var(--bg-input);         color: var(--text-secondary); }
 
 /* ─── PROGRESS BAR ───────────────────────────────────────── */
 .progress-bar {

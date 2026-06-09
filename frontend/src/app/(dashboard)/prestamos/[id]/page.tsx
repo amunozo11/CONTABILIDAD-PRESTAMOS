@@ -129,7 +129,7 @@ export default function PrestamoDetailPage({ params }: { params: Promise<{ id: s
       <div className="card">
         <h2 style={{ margin: '0 0 14px', fontSize: 15, fontWeight: 700 }}>Condiciones</h2>
         {[
-          { label: 'Interés (20%)', value: formatCOP(prestamo.totalInteres) },
+          { label: `Interés (${prestamo.interes ?? 20}%)`, value: formatCOP(prestamo.totalInteres) },
           { label: 'Papelería descontada', value: formatCOP(prestamo.papeleria ?? 0) },
           { label: 'El cliente recibió', value: formatCOP(prestamo.montoDesembolsado ?? 0), highlight: true },
           { label: 'Total a pagar', value: formatCOP(prestamo.totalPagar), highlight: true },
@@ -146,7 +146,7 @@ export default function PrestamoDetailPage({ params }: { params: Promise<{ id: s
             <span style={{
               fontSize: highlight ? 15 : 14,
               fontWeight: highlight ? 800 : 600,
-              color: highlight ? 'var(--brand-600)' : 'var(--text-primary)',
+              color: highlight ? 'var(--brand-text)' : 'var(--text-primary)',
             }}>{value}</span>
           </div>
         ))}

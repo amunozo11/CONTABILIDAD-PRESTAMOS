@@ -19,10 +19,11 @@ export function calcularPrestamo(
   capital: number,
   modalidad: 'diaria' | 'semanal',
   fechaInicio: Date,
-  plazoPersonalizado?: number
+  plazoPersonalizado?: number,
+  interes: number = INTERES_FIJO
 ) {
   const numeroCuotas = plazoPersonalizado ?? (modalidad === 'diaria' ? CUOTAS_DIARIAS : CUOTAS_SEMANALES);
-  const totalInteres = Math.round(capital * INTERES_FIJO / 100);
+  const totalInteres = Math.round(capital * interes / 100);
   const totalPagar = capital + totalInteres;
   const cuotaBase = totalPagar / numeroCuotas;
   // Redondear al múltiplo de 100 más cercano hacia arriba
@@ -108,14 +109,14 @@ export class PrestamosService {
     }
 
     const fechaInicio = toZonedTime(dto.fechaInicio, TIMEZONE);
-    const calc = calcularPrestamo(dto.capital, dto.modalidad, fechaInicio, dto.numeroCuotas);
+    const calc = calcularPrestamo(dto.capital, dto.modalidad, fechaInicio, dto.numeroCuotas, dto.interes);
     const cuotas = generarCuotas(fechaInicio, calc.numeroCuotas, calc.cuotaMonto, dto.modalidad);
 
     const prestamo = await PrestamoModel.create({
       cliente: dto.clienteId,
       cobrador: cobradorId,
       capital: dto.capital,
-      interes: INTERES_FIJO,
+      interes: dto.interes ?? INTERES_FIJO,
       modalidad: dto.modalidad,
       papeleria: calc.papeleria,
       montoDesembolsado: calc.montoDesembolsado,

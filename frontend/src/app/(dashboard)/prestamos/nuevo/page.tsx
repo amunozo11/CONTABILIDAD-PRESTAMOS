@@ -5,9 +5,11 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { z } from 'zod';
-import { Loader2, Calculator } from 'lucide-react';
+import { Loader2, Calculator, Percent } from 'lucide-react';
 import { apiClient } from '@/services/api';
 import { calcularPrestamo, formatCOP, fechaHoyISO } from '@/lib/utils';
+
+const TASAS_RAPIDAS = [10, 15, 20];
 
 const schema = z.object({
   clienteId: z.string().min(1, 'Selecciona un cliente'),
@@ -15,6 +17,9 @@ const schema = z.object({
     .transform(Number)
     .pipe(z.number().min(10_000, 'Mínimo $10.000')),
   modalidad: z.enum(['diaria', 'semanal'], { required_error: 'Selecciona una modalidad' }),
+  interes: z.string().min(1, 'El interés es requerido')
+    .transform(Number)
+    .pipe(z.number().min(5, 'Mínimo 5%').max(100, 'Máximo 100%')),
   numeroCuotas: z.string().min(1, 'El plazo es requerido')
     .transform(Number)
     .pipe(z.number().int().positive('Debe ser mayor a 0')),
@@ -32,23 +37,29 @@ export default function NuevoPrestamoPage() {
   const [capitalVal, setCapitalVal] = useState('');
   const [modalidadVal, setModalidadVal] = useState<'diaria' | 'semanal'>('diaria');
   const [plazoVal, setPlazoVal] = useState('115');
+  const [interesVal, setInteresVal] = useState('20');
 
   const { register, handleSubmit, watch, setValue, formState: { errors } } = useForm<FormData>({
     resolver: zodResolver(schema),
-    defaultValues: { fechaInicio: fechaHoyISO(), modalidad: 'diaria', numeroCuotas: '115' as unknown as number },
+    defaultValues: {
+      fechaInicio: fechaHoyISO(),
+      modalidad: 'diaria',
+      numeroCuotas: '115' as unknown as number,
+      interes: '20' as unknown as number,
+    },
   });
 
-  // Buscar clientes para el selector
   const { data: clientesData } = useQuery({
     queryKey: ['clientes-select'],
     queryFn: () => apiClient.get('/api/clientes?estado=activo&limit=100').then((r) => r.data.data),
   });
 
-  const actualizarPreview = (capital: string, modalidad: 'diaria' | 'semanal', plazo: string) => {
+  const actualizarPreview = (capital: string, modalidad: 'diaria' | 'semanal', plazo: string, tasa: string) => {
     const num = Number(capital.replace(/\D/g, ''));
     const pNum = Number(plazo);
-    if (num >= 10_000 && pNum > 0) {
-      setPreview(calcularPrestamo(num, modalidad, pNum));
+    const iNum = Number(tasa);
+    if (num >= 10_000 && pNum > 0 && iNum >= 5) {
+      setPreview(calcularPrestamo(num, modalidad, pNum, iNum));
     } else {
       setPreview(null);
     }
@@ -59,6 +70,7 @@ export default function NuevoPrestamoPage() {
       ...data,
       capital: typeof data.capital === 'string' ? Number((data.capital as string).replace(/\D/g, '')) : data.capital,
       numeroCuotas: typeof data.numeroCuotas === 'string' ? Number(data.numeroCuotas) : data.numeroCuotas,
+      interes: typeof data.interes === 'string' ? Number(data.interes) : data.interes,
     }),
     onSuccess: (res) => {
       queryClient.invalidateQueries({ queryKey: ['prestamos'] });
@@ -77,7 +89,7 @@ export default function NuevoPrestamoPage() {
       <div>
         <h1 style={{ margin: 0, fontSize: 20, fontWeight: 800 }}>Nuevo Préstamo</h1>
         <p style={{ margin: '4px 0 0', fontSize: 13, color: 'var(--text-muted)' }}>
-          Interés fijo 20% · Papelería $5.000 por $100.000
+          Tasa personalizada · Papelería $5.000 por $100.000
         </p>
       </div>
 
@@ -101,7 +113,7 @@ export default function NuevoPrestamoPage() {
           </div>
         </div>
 
-        {/* Condiciones del préstamo */}
+        {/* Condiciones */}
         <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <h2 style={{ margin: 0, fontSize: 14, fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
             Condiciones
@@ -119,10 +131,64 @@ export default function NuevoPrestamoPage() {
                 const raw = e.target.value.replace(/\D/g, '');
                 setCapitalVal(raw ? `$ ${Number(raw).toLocaleString('es-CO')}` : '');
                 setValue('capital', raw as unknown as number);
-                actualizarPreview(raw, modalidadVal, plazoVal);
+                actualizarPreview(raw, modalidadVal, plazoVal, interesVal);
               }}
             />
             {errors.capital && <p className="input-error">{errors.capital.message as string}</p>}
+          </div>
+
+          {/* Tasa de interés */}
+          <div>
+            <label className="input-label">Tasa de interés *</label>
+            {/* Botones rápidos */}
+            <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+              {TASAS_RAPIDAS.map((tasa) => (
+                <button
+                  key={tasa}
+                  type="button"
+                  onClick={() => {
+                    const t = String(tasa);
+                    setInteresVal(t);
+                    setValue('interes', tasa as unknown as number);
+                    actualizarPreview(capitalVal.replace(/\D/g, ''), modalidadVal, plazoVal, t);
+                  }}
+                  style={{
+                    flex: 1,
+                    padding: '10px 4px',
+                    border: `2px solid ${interesVal === String(tasa) ? 'var(--brand-500)' : 'var(--border)'}`,
+                    borderRadius: 'var(--radius-md)',
+                    background: interesVal === String(tasa) ? 'var(--brand-50)' : 'transparent',
+                    color: interesVal === String(tasa) ? 'var(--brand-text)' : 'var(--text-primary)',
+                    fontWeight: 700,
+                    fontSize: 15,
+                    cursor: 'pointer',
+                    transition: 'all var(--transition)',
+                  }}
+                >
+                  {tasa}%
+                </button>
+              ))}
+            </div>
+            {/* Input personalizado */}
+            <div style={{ position: 'relative' }}>
+              <input
+                type="number"
+                className="input-field"
+                placeholder="Otro (ej. 12)"
+                min={5}
+                max={100}
+                value={interesVal}
+                style={{ paddingRight: 36 }}
+                onChange={(e) => {
+                  const raw = e.target.value;
+                  setInteresVal(raw);
+                  setValue('interes', Number(raw) as unknown as number);
+                  actualizarPreview(capitalVal.replace(/\D/g, ''), modalidadVal, plazoVal, raw);
+                }}
+              />
+              <Percent size={14} color="var(--text-muted)" style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }} />
+            </div>
+            {errors.interes && <p className="input-error">{errors.interes.message as string}</p>}
           </div>
 
           {/* Modalidad */}
@@ -151,10 +217,10 @@ export default function NuevoPrestamoPage() {
                       const defPlazo = m === 'diaria' ? '115' : '4';
                       setPlazoVal(defPlazo);
                       setValue('numeroCuotas', defPlazo as unknown as number);
-                      actualizarPreview(capitalVal.replace(/\D/g, ''), m, defPlazo);
+                      actualizarPreview(capitalVal.replace(/\D/g, ''), m, defPlazo, interesVal);
                     }}
                   />
-                  <span style={{ fontSize: 15, fontWeight: 700, color: modalidadVal === m ? 'var(--brand-600)' : 'var(--text-primary)' }}>
+                  <span style={{ fontSize: 15, fontWeight: 700, color: modalidadVal === m ? 'var(--brand-text)' : 'var(--text-primary)' }}>
                     {m === 'diaria' ? 'Diaria' : 'Semanal'}
                   </span>
                 </label>
@@ -163,7 +229,7 @@ export default function NuevoPrestamoPage() {
             {errors.modalidad && <p className="input-error">{errors.modalidad.message}</p>}
           </div>
 
-          {/* Plazo (Días o Semanas) */}
+          {/* Plazo */}
           <div>
             <label className="input-label">Plazo ({modalidadVal === 'diaria' ? 'Días' : 'Semanas'}) *</label>
             <input
@@ -175,7 +241,7 @@ export default function NuevoPrestamoPage() {
                 const raw = e.target.value.replace(/\D/g, '');
                 setPlazoVal(raw);
                 setValue('numeroCuotas', raw as unknown as number);
-                actualizarPreview(capitalVal.replace(/\D/g, ''), modalidadVal, raw);
+                actualizarPreview(capitalVal.replace(/\D/g, ''), modalidadVal, raw, interesVal);
               }}
             />
             {errors.numeroCuotas && <p className="input-error">{errors.numeroCuotas.message}</p>}
@@ -184,11 +250,7 @@ export default function NuevoPrestamoPage() {
           {/* Fecha inicio */}
           <div>
             <label className="input-label">Fecha de inicio *</label>
-            <input
-              type="date"
-              className="input-field"
-              {...register('fechaInicio')}
-            />
+            <input type="date" className="input-field" {...register('fechaInicio')} />
             {errors.fechaInicio && <p className="input-error">{errors.fechaInicio.message}</p>}
           </div>
         </div>
@@ -201,7 +263,7 @@ export default function NuevoPrestamoPage() {
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
               <Calculator size={18} color="var(--brand-500)" />
-              <h3 style={{ margin: 0, fontSize: 14, fontWeight: 700, color: 'var(--brand-600)' }}>
+              <h3 style={{ margin: 0, fontSize: 14, fontWeight: 700, color: 'var(--brand-text)' }}>
                 Resumen del préstamo
               </h3>
             </div>
@@ -210,8 +272,8 @@ export default function NuevoPrestamoPage() {
               { label: 'Capital', value: formatCOP(Number(capitalVal.replace(/\D/g, ''))), highlight: false },
               { label: 'Papelería (descuento al cliente)', value: `- ${formatCOP(preview.papeleria)}`, highlight: false },
               { label: 'El cliente recibe', value: formatCOP(preview.montoDesembolsado), highlight: true },
-              null, // separador
-              { label: `Interés (20%)`, value: formatCOP(preview.totalInteres), highlight: false },
+              null,
+              { label: `Interés (${interesVal}%)`, value: formatCOP(preview.totalInteres), highlight: false },
               { label: 'Total a cobrar', value: formatCOP(preview.totalPagar), highlight: true },
               { label: preview.descripcion, value: '', highlight: false },
             ].map((item, i) =>
@@ -230,7 +292,7 @@ export default function NuevoPrestamoPage() {
                   <span style={{
                     fontSize: item.highlight ? 16 : 14,
                     fontWeight: item.highlight ? 800 : 600,
-                    color: item.highlight ? 'var(--brand-600)' : 'var(--text-primary)',
+                    color: item.highlight ? 'var(--brand-text)' : 'var(--text-primary)',
                   }}>
                     {item.value}
                   </span>

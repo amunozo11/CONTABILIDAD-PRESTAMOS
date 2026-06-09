@@ -10,9 +10,14 @@ export function calcularPapeleria(capital: number): number {
   return Math.max(5000, calculada);
 }
 
-export function calcularPrestamo(capital: number, modalidad: 'diaria' | 'semanal', plazoPersonalizado?: number) {
+export function calcularPrestamo(
+  capital: number,
+  modalidad: 'diaria' | 'semanal',
+  plazoPersonalizado?: number,
+  interes: number = INTERES_FIJO
+) {
   const numeroCuotas = plazoPersonalizado ?? (modalidad === 'diaria' ? CUOTAS_DIARIAS : CUOTAS_SEMANALES);
-  const totalInteres = Math.round(capital * INTERES_FIJO / 100);
+  const totalInteres = Math.round(capital * interes / 100);
   const totalPagar = capital + totalInteres;
   const cuotaBase = totalPagar / numeroCuotas;
   const cuotaMonto = Math.ceil(cuotaBase / 100) * 100;

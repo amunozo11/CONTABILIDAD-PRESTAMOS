@@ -21,6 +21,12 @@ export const CrearPrestamoDto = z.object({
   modalidad: z.enum(['diaria', 'semanal'], {
     required_error: 'La modalidad es requerida (diaria o semanal)',
   }),
+  interes: z
+    .number()
+    .min(5, 'El interés mínimo es 5%')
+    .max(100, 'El interés máximo es 100%')
+    .optional()
+    .default(INTERES_FIJO),
   numeroCuotas: z
     .number()
     .int()
