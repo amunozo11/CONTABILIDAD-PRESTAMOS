@@ -18,7 +18,7 @@ log "🚀 Iniciando despliegue GotaGota..."
 
 # ─── Pull últimos cambios ──────────────────────────────────
 log "📥 Actualizando código..."
-git pull origin main
+git pull origin master
 
 # ─── Build de imágenes ────────────────────────────────────
 log "🏗️  Construyendo imágenes Docker..."
